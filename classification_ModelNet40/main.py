@@ -19,6 +19,7 @@ from data import ModelNet40
 from torch.optim.lr_scheduler import CosineAnnealingLR
 import sklearn.metrics as metrics
 import numpy as np
+from tqdm import tqdm
 
 
 def parse_args():
@@ -46,7 +47,7 @@ def main():
     os.environ["HDF5_USE_FILE_LOCKING"] = "FALSE"
 
     #assert torch.cuda.is_available(), "Please ensure codes are executed in cuda."
-    device = 'cpu'
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
     if args.seed is not None:
         torch.manual_seed(args.seed)
         np.random.seed(args.seed)
@@ -184,7 +185,7 @@ def train(net, trainloader, optimizer, criterion, device):
     train_pred = []
     train_true = []
     time_cost = datetime.datetime.now()
-    for batch_idx, (data, label) in enumerate(trainloader):
+    for batch_idx, (data, label) in tqdm(enumerate(trainloader)):
         data, label = data.to(device), label.to(device).squeeze()
         data = data.permute(0, 2, 1)  # so, the input data shape is [batch, 3, 1024]
         optimizer.zero_grad()
