@@ -60,19 +60,29 @@ def jitter_pointcloud(pointcloud, sigma=0.01, clip=0.02):
 
 
 class ModelNet40(Dataset):
-    def __init__(self, num_points, partition='train'):
+    def __init__(self, num_points, partition='train', dual_net= False, num_points_low= 128 ):
         self.data, self.label = load_data(partition)
         self.num_points = num_points
-        self.partition = partition        
+        self.partition = partition
+        self.dual_net= dual_net
+        self.num_points_low= num_points_low
 
     def __getitem__(self, item):
         pointcloud = self.data[item][:self.num_points]
+        if self.dual_net == True:
+            pointcloud2 = self.data[item][:self.num_points_low]
         label = self.label[item]
         if self.partition == 'train':
             # pointcloud = random_point_dropout(pointcloud) # open for dgcnn not for our idea  for all
             pointcloud = translate_pointcloud(pointcloud)
             np.random.shuffle(pointcloud)
-        return pointcloud, label
+            if self.dual_net== True:
+                pointcloud2 = translate_pointcloud(pointcloud2)
+                np.random.shuffle(pointcloud2)
+        if self.dual_net == True:
+            return pointcloud, pointcloud2, label
+        else:
+            return pointcloud, label
 
     def __len__(self):
         return self.data.shape[0]

@@ -28,10 +28,12 @@ def parse_args():
     parser.add_argument('-c', '--checkpoint', type=str, metavar='PATH',
                         help='path to save checkpoint (default: checkpoint)')
     parser.add_argument('--msg', type=str, help='message after checkpoint')
+    parser.add_argument('--dual_net', type=bool, default=False, help='enable dual network')
     parser.add_argument('--batch_size', type=int, default=32, help='batch size in training')
     parser.add_argument('--model', default='PointNet', help='model name [default: pointnet_cls]')
     parser.add_argument('--epoch', default=300, type=int, help='number of epoch in training')
     parser.add_argument('--num_points', type=int, default=1024, help='Point Number')
+    parser.add_argument('--num_points_low', type=int, default=128, help='Point Number')
     parser.add_argument('--learning_rate', default=0.1, type=float, help='learning rate in training')
     parser.add_argument('--min_lr', default=0.005, type=float, help='min lr')
     parser.add_argument('--weight_decay', type=float, default=2e-4, help='decay rate')
@@ -120,9 +122,9 @@ def main():
         optimizer_dict = checkpoint['optimizer']
 
     printf('==> Preparing data..')
-    train_loader = DataLoader(ModelNet40(partition='train', num_points=args.num_points), num_workers=args.workers,
+    train_loader = DataLoader(ModelNet40(partition='train', num_points=args.num_points, dual_net= args.dual_net, num_points_low= args.num_points_low), num_workers=args.workers,
                               batch_size=args.batch_size, shuffle=True, drop_last=True)
-    test_loader = DataLoader(ModelNet40(partition='test', num_points=args.num_points), num_workers=args.workers,
+    test_loader = DataLoader(ModelNet40(partition='test', num_points=args.num_points, dual_net= args.dual_net, num_points_low= args.num_points_low), num_workers=args.workers,
                              batch_size=args.batch_size // 2, shuffle=False, drop_last=False)
 
     optimizer = torch.optim.SGD(net.parameters(), lr=args.learning_rate, momentum=0.9, weight_decay=args.weight_decay)
@@ -185,7 +187,11 @@ def train(net, trainloader, optimizer, criterion, device):
     train_pred = []
     train_true = []
     time_cost = datetime.datetime.now()
-    for batch_idx, (data, label) in tqdm(enumerate(trainloader)):
+    for batch_idx, data in tqdm(enumerate(trainloader)):
+        if len(data)== 2:
+            data, label= data
+        elif len(data)== 3:
+            data, data2, label= data
         data, label = data.to(device), label.to(device).squeeze()
         data = data.permute(0, 2, 1)  # so, the input data shape is [batch, 3, 1024]
         optimizer.zero_grad()
