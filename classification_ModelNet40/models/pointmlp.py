@@ -329,15 +329,22 @@ class Model(nn.Module):
             nn.Linear(256, self.class_num)
         )
 
-    def forward(self, x):
+    def forward(self, x, debug=False):
         xyz = x.permute(0, 2, 1)
         batch_size, _, _ = x.size()
         x = self.embedding(x)  # B,D,N
         for i in range(self.stages):
             # Give xyz[b, p, 3] and fea[b, p, d], return new_xyz[b, g, 3] and new_fea[b, g, k, d]
             xyz, x = self.local_grouper_list[i](xyz, x.permute(0, 2, 1))  # [b,g,3]  [b,g,k,d]
+            if debug:
+                print(xyz.shape)
+                print(x.size())
             x = self.pre_blocks_list[i](x)  # [b,d,g]
+            if debug:
+                print(x.shape)
             x = self.pos_blocks_list[i](x)  # [b,d,g]
+            if debug:
+                print(x.shape)
 
         x = F.adaptive_max_pool1d(x, 1).squeeze(dim=-1)
         x = self.classifier(x)
@@ -346,11 +353,11 @@ class Model(nn.Module):
 
 
 
-def pointMLP(num_classes=40, **kwargs) -> Model:
-    return Model(points=1024, class_num=num_classes, embed_dim=64, groups=1, res_expansion=1.0,
+def pointMLP(num_classes=40, points=1024, k_neighbor=[24, 24, 24, 24], **kwargs) -> Model:
+    return Model(points=points, class_num=num_classes, embed_dim=64, groups=1, res_expansion=1.0,
                    activation="relu", bias=False, use_xyz=False, normalize="anchor",
                    dim_expansion=[2, 2, 2, 2], pre_blocks=[2, 2, 2, 2], pos_blocks=[2, 2, 2, 2],
-                   k_neighbors=[24, 24, 24, 24], reducers=[2, 2, 2, 2], **kwargs)
+                   k_neighbors=k_neighbor, reducers=[2, 2, 2, 2], **kwargs)
 
 
 def pointMLPElite(num_classes=40, **kwargs) -> Model:

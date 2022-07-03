@@ -152,13 +152,10 @@ Our implementation is mainly based on the following codebases. We gratefully tha
 [GDANet](https://github.com/mutianxu/GDANet),
 [Pointnet2_PyTorch](https://github.com/erikwijmans/Pointnet2_PyTorch)
 
-## LICENSE
-PointMLP is under the Apache-2.0 license. 
-Please contact the authors for commercial use.
+# My experiments: DUAL NET
 
-
-
-
-
-
-"# point_mlp_research" 
+```yaml
+dual_net: True
+num_points_low: 256
+neighbours: 12
+```

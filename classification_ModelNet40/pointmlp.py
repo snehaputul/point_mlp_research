@@ -40,10 +40,6 @@ def parse_args():
     parser.add_argument('--seed', type=int, help='random seed')
     parser.add_argument('--workers', default=8, type=int, help='workers')
 
-    # dual net parameters
-    parser.add_argument('--num_points_low', type=int, default=128, help='Point Number')
-    parser.add_argument('--neighbours', type=int, default=24, help='Point Number')
-
     return parser.parse_args()
 
 
@@ -88,7 +84,7 @@ def main():
     # Model
     printf(f"args: {args}")
     printf('==> Building model..')
-    net = models.__dict__[args.model](points = args.num_points_low, k_neighbor=[args.neighbours,args.neighbours,args.neighbours,args.neighbours])
+    net = models.__dict__[args.model]()
 
     criterion = cal_loss
     net = net.to(device)
@@ -204,7 +200,7 @@ def train(net, trainloader, optimizer, criterion, device):
         data, label = data.to(device), label.to(device).squeeze()
 
         optimizer.zero_grad()
-        logits = net(data2, debug=True)
+        logits = net(data)
         loss = criterion(logits, label)
         loss.backward()
         torch.nn.utils.clip_grad_norm_(net.parameters(), 1)
