@@ -14,6 +14,7 @@ import torch.utils.data
 import torch.utils.data.distributed
 from torch.utils.data import DataLoader
 import models as models
+from classification_ModelNet40.models.pointmlp import Model
 from utils import Logger, mkdir_p, progress_bar, save_model, save_args, cal_loss
 from data import ModelNet40
 from torch.optim.lr_scheduler import CosineAnnealingLR
@@ -40,9 +41,14 @@ def parse_args():
     parser.add_argument('--seed', type=int, help='random seed')
     parser.add_argument('--workers', default=8, type=int, help='workers')
 
-    # dual net parameters
+    # sparse net parameters
     parser.add_argument('--num_points_low', type=int, default=128, help='Point Number')
-    parser.add_argument('--neighbours', type=int, default=24, help='Point Number')
+    parser.add_argument('--neighbours_low', type=int, default=12, help='Point Number')
+
+    # dense net parameteres
+    parser.add_argument('--num_points_high', type=int, default=2048, help='Point Number')
+    parser.add_argument('--neighbours_high', type=int, default=24, help='Point Number')
+    parser.add_argument('--num_channel', type=int, default=32, help='Point Number')
 
     return parser.parse_args()
 
@@ -88,13 +94,19 @@ def main():
     # Model
     printf(f"args: {args}")
     printf('==> Building model..')
-    net = models.__dict__[args.model](points = args.num_points_low, k_neighbor=[args.neighbours,args.neighbours,args.neighbours,args.neighbours])
+    sparse_net = models.__dict__[args.model](points = args.num_points_low, k_neighbor=[args.neighbours_low]*4)
+    dense_net = Model(points=args.num_points_high, class_num= 40, embed_dim=args.num_channel, groups=1, res_expansion=1.0,
+                   activation="relu", bias=False, use_xyz=False, normalize="anchor",
+                   dim_expansion=[2, 2, 2, 2], pre_blocks=[2, 2, 2, 2], pos_blocks=[2, 2, 2, 2],
+                   k_neighbors= [args.neighbours_high]*4, reducers=[2, 2, 2, 2])
 
     criterion = cal_loss
-    net = net.to(device)
+    sparse_net = sparse_net.to(device)
+    dense_net = dense_net.to(device)
     # criterion = criterion.to(device)
     if device == 'cuda':
-        net = torch.nn.DataParallel(net)
+        sparse_net = torch.nn.DataParallel(sparse_net)
+        dense_net = torch.nn.DataParallel(dense_net)
         cudnn.benchmark = True
 
     best_test_acc = 0.  # best test accuracy
@@ -116,7 +128,8 @@ def main():
         printf(f"Resuming last checkpoint from {args.checkpoint}")
         checkpoint_path = os.path.join(args.checkpoint, "last_checkpoint.pth")
         checkpoint = torch.load(checkpoint_path)
-        net.load_state_dict(checkpoint['net'])
+        sparse_net.load_state_dict(checkpoint['sparse_net'])
+        dense_net.load_state_dict(checkpoint['dense_net'])
         start_epoch = checkpoint['epoch']
         best_test_acc = checkpoint['best_test_acc']
         best_train_acc = checkpoint['best_train_acc']
@@ -128,20 +141,20 @@ def main():
         optimizer_dict = checkpoint['optimizer']
 
     printf('==> Preparing data..')
-    train_loader = DataLoader(ModelNet40(partition='train', num_points=args.num_points, dual_net= args.dual_net, num_points_low= args.num_points_low), num_workers=args.workers,
+    train_loader = DataLoader(ModelNet40(partition='train', num_points=args.num_points_high, dual_net= args.dual_net, num_points_low= args.num_points_low), num_workers=args.workers,
                               batch_size=args.batch_size, shuffle=True, drop_last=True)
-    test_loader = DataLoader(ModelNet40(partition='test', num_points=args.num_points, dual_net= args.dual_net, num_points_low= args.num_points_low), num_workers=args.workers,
+    test_loader = DataLoader(ModelNet40(partition='test', num_points=args.num_points_high, dual_net= args.dual_net, num_points_low= args.num_points_low), num_workers=args.workers,
                              batch_size=args.batch_size // 2, shuffle=False, drop_last=False)
 
-    optimizer = torch.optim.SGD(net.parameters(), lr=args.learning_rate, momentum=0.9, weight_decay=args.weight_decay)
+    optimizer = torch.optim.SGD(list(sparse_net.parameters())+list(dense_net.parameters()), lr=args.learning_rate, momentum=0.9, weight_decay=args.weight_decay)
     if optimizer_dict is not None:
         optimizer.load_state_dict(optimizer_dict)
     scheduler = CosineAnnealingLR(optimizer, args.epoch, eta_min=args.min_lr, last_epoch=start_epoch - 1)
 
     for epoch in range(start_epoch, args.epoch):
         printf('Epoch(%d/%s) Learning Rate %s:' % (epoch + 1, args.epoch, optimizer.param_groups[0]['lr']))
-        train_out = train(net, train_loader, optimizer, criterion, device)  # {"loss", "acc", "acc_avg", "time"}
-        test_out = validate(net, test_loader, criterion, device)
+        train_out = train(sparse_net, dense_net, train_loader, optimizer, criterion, device)  # {"loss", "acc", "acc_avg", "time"}
+        test_out = validate(sparse_net, dense_net, test_loader, criterion, device)
         scheduler.step()
 
         if test_out["acc"] > best_test_acc:
@@ -158,7 +171,7 @@ def main():
         best_train_loss = train_out["loss"] if (train_out["loss"] < best_train_loss) else best_train_loss
 
         save_model(
-            net, epoch, path=args.checkpoint, acc=test_out["acc"], is_best=is_best,
+            sparse_net, dense_net, epoch, path=args.checkpoint, acc=test_out["acc"], is_best=is_best,
             best_test_acc=best_test_acc,  # best test accuracy
             best_train_acc=best_train_acc,
             best_test_acc_avg=best_test_acc_avg,
@@ -185,8 +198,9 @@ def main():
     printf(f"++++++++" * 5)
 
 
-def train(net, trainloader, optimizer, criterion, device):
-    net.train()
+def train(sparse_net, dense_net, trainloader, optimizer, criterion, device):
+    sparse_net.train()
+    dense_net.train()
     train_loss = 0
     correct = 0
     total = 0
@@ -204,10 +218,12 @@ def train(net, trainloader, optimizer, criterion, device):
         data, label = data.to(device), label.to(device).squeeze()
 
         optimizer.zero_grad()
-        logits = net(data2, debug=True)
+        sparse_logits = sparse_net(data2, debug=True)
+        dense_logits = dense_net(data, debug=True)
         loss = criterion(logits, label)
         loss.backward()
-        torch.nn.utils.clip_grad_norm_(net.parameters(), 1)
+        torch.nn.utils.clip_grad_norm_(sparse_net.parameters(), 1)
+        torch.nn.utils.clip_grad_norm_(dense_net.parameters(), 1)
         optimizer.step()
         train_loss += loss.item()
         preds = logits.max(dim=1)[1]
@@ -232,7 +248,7 @@ def train(net, trainloader, optimizer, criterion, device):
     }
 
 
-def validate(net, testloader, criterion, device):
+def validate(sparse_net, dense_net, testloader, criterion, device):
     net.eval()
     test_loss = 0
     correct = 0

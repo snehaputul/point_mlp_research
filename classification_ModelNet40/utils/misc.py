@@ -164,9 +164,10 @@ def format_time(seconds):
     return f
 
 
-def save_model(net, epoch, path, acc, is_best, **kwargs):
+def save_model(sparse_net, dense_net, epoch, path, acc, is_best, **kwargs):
     state = {
-        'net': net.state_dict(),
+        'sparse_net': sparse_net.state_dict(),
+        'dense_net': dense_net.state_dict(),
         'epoch': epoch,
         'acc': acc
     }

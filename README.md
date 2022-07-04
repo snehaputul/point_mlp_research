@@ -158,4 +158,8 @@ Our implementation is mainly based on the following codebases. We gratefully tha
 dual_net: True
 num_points_low: 256
 neighbours: 12
+num_points_high: 2048
+num_channel: 16
+num_neughbours_low: 12
+num_neighbours_high: 24
 ```

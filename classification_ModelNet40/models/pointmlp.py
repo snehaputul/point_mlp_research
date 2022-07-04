@@ -353,7 +353,7 @@ class Model(nn.Module):
 
 
 
-def pointMLP(num_classes=40, points=1024, k_neighbor=[24, 24, 24, 24], **kwargs) -> Model:
+def pointMLP(num_classes=40, points=1024, k_neighbor=[24, 24, 24, 24], num_channel=64, **kwargs) -> Model:
     return Model(points=points, class_num=num_classes, embed_dim=64, groups=1, res_expansion=1.0,
                    activation="relu", bias=False, use_xyz=False, normalize="anchor",
                    dim_expansion=[2, 2, 2, 2], pre_blocks=[2, 2, 2, 2], pos_blocks=[2, 2, 2, 2],
