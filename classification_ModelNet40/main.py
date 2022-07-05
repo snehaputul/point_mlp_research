@@ -21,7 +21,7 @@ from torch.optim.lr_scheduler import CosineAnnealingLR
 import sklearn.metrics as metrics
 import numpy as np
 from tqdm import tqdm
-from torchsummary import summary
+
 
 
 def parse_args():
@@ -95,6 +95,7 @@ def main():
     printf(f"args: {args}")
     printf('==> Building model..')
     sparse_net = models.__dict__[args.model](points = args.num_points_low, k_neighbor=[args.neighbours_low]*4)
+    sparse_net.classifier[0]= torch.nn.Linear(1280, 512)
     dense_net = Model(points=args.num_points_high, class_num= 40, embed_dim=args.num_channel, groups=1, res_expansion=1.0,
                    activation="relu", bias=False, use_xyz=False, normalize="anchor",
                    dim_expansion=[2, 2, 2, 2], pre_blocks=[2, 2, 2, 2], pos_blocks=[2, 2, 2, 2],
@@ -218,8 +219,9 @@ def train(sparse_net, dense_net, trainloader, optimizer, criterion, device):
         data, label = data.to(device), label.to(device).squeeze()
 
         optimizer.zero_grad()
-        sparse_logits = sparse_net(data2, debug=True)
-        dense_logits = dense_net(data, debug=True)
+        dense_logits, inter_x = dense_net(data, debug=False)
+        logits, inter_x = sparse_net(data2, inter_x, debug=False)
+
         loss = criterion(logits, label)
         loss.backward()
         torch.nn.utils.clip_grad_norm_(sparse_net.parameters(), 1)
@@ -249,7 +251,8 @@ def train(sparse_net, dense_net, trainloader, optimizer, criterion, device):
 
 
 def validate(sparse_net, dense_net, testloader, criterion, device):
-    net.eval()
+    sparse_net.eval()
+    dense_net.eval()
     test_loss = 0
     correct = 0
     total = 0
@@ -257,10 +260,18 @@ def validate(sparse_net, dense_net, testloader, criterion, device):
     test_pred = []
     time_cost = datetime.datetime.now()
     with torch.no_grad():
-        for batch_idx, (data, label) in enumerate(testloader):
+        for batch_idx, data in enumerate(testloader):
+            if len(data) == 2:
+                data, label = data
+                data = data.permute(0, 2, 1)
+            elif len(data) == 3:
+                data, data2, label = data
+                data = data.permute(0, 2, 1)
+                data2 = data2.permute(0, 2, 1)
             data, label = data.to(device), label.to(device).squeeze()
-            data = data.permute(0, 2, 1)
-            logits = net(data)
+
+            dense_logits, inter_x = dense_net(data, debug=False)
+            logits, inter_x = sparse_net(data2, inter_x, debug=False)
             loss = criterion(logits, label)
             test_loss += loss.item()
             preds = logits.max(dim=1)[1]

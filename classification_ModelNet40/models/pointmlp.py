@@ -329,7 +329,9 @@ class Model(nn.Module):
             nn.Linear(256, self.class_num)
         )
 
-    def forward(self, x, debug=False):
+
+    def forward(self, x, inter_x_prv= None, debug=False):
+        inter_x= []
         xyz = x.permute(0, 2, 1)
         batch_size, _, _ = x.size()
         x = self.embedding(x)  # B,D,N
@@ -345,10 +347,15 @@ class Model(nn.Module):
             x = self.pos_blocks_list[i](x)  # [b,d,g]
             if debug:
                 print(x.shape)
+            inter_x.append(x)
 
         x = F.adaptive_max_pool1d(x, 1).squeeze(dim=-1)
+        inter_x.append(x)
+        if inter_x_prv!= None:
+            #x= x*inter_x_prv[-1]
+            x= torch.cat((x, inter_x_prv[-1]), -1)
         x = self.classifier(x)
-        return x
+        return x, inter_x
 
 
 
