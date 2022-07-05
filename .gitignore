@@ -12,6 +12,7 @@ build/
 develop-eggs/
 dist/
 downloads/
+checkpoints/
 eggs/
 .eggs/
 lib/
@@ -128,3 +129,4 @@ dmypy.json
 # Pyre type checker
 .pyre/
 .DS_Store
+/classification_ModelNet40/checkpoints/

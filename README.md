@@ -163,3 +163,8 @@ num_channel: 16
 num_neughbours_low: 12
 num_neighbours_high: 24
 ```
+
+| Experiment                        | Msg       | Results |
+|-----------------------------------|-----------|---------|
+| Original PointMLP (expected 94.5) | None      | 93.5%   |
+| Dual PointMLP (last layer concat) | dual_last |

@@ -29,7 +29,7 @@ echo "Port: $MPORT"
 module load MistEnv/2020a cuda gcc anaconda3 cmake cudnn swig sox/14.4.2
 source activate pytorch_env
 
-COMMAND="python -W ignore main.py --model pointMLP --workers 16"
+COMMAND="python -W ignore main.py --model pointMLP --workers 16 --msg dual_last"
 echo "Command: $COMMAND"
 $COMMAND
 
