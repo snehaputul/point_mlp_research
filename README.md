@@ -157,14 +157,13 @@ Our implementation is mainly based on the following codebases. We gratefully tha
 ```yaml
 dual_net: True
 num_points_low: 256
-neighbours: 12
 num_points_high: 2048
 num_channel: 16
-num_neughbours_low: 12
-num_neighbours_high: 24
+neighbours_low: 12
+neighbours_high: 24
 ```
 
-| Experiment                        | Msg       | Results |
-|-----------------------------------|-----------|---------|
-| Original PointMLP (expected 94.5) | None      | 93.5%   |
-| Dual PointMLP (last layer concat) | dual_last |
+| Experiment                        | Msg       | Results | Script                                                                                                                                                               |
+|-----------------------------------|-----------|---------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Original PointMLP (expected 94.5) | None      | 93.5%   |                                                                                                                                                                      |
+| Dual PointMLP (last layer concat) | dual_last |         | --model pointMLP --workers 16 --dual_net True --num_points_low 256 --num_points_high 2048 --neighbours_high 24 --num_channel 16 --neighbours_low 12  --msg dual_last |
