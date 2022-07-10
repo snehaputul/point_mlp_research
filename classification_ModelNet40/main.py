@@ -14,7 +14,7 @@ import torch.utils.data
 import torch.utils.data.distributed
 from torch.utils.data import DataLoader
 import models as models
-from classification_ModelNet40.models.pointmlp import Model
+from models.pointmlp import Model
 from utils import Logger, mkdir_p, progress_bar, save_model, save_args, cal_loss
 from data import ModelNet40
 from torch.optim.lr_scheduler import CosineAnnealingLR
