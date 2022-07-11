@@ -208,7 +208,7 @@ def train(sparse_net, dense_net, trainloader, optimizer, criterion, device):
     train_pred = []
     train_true = []
     time_cost = datetime.datetime.now()
-    for batch_idx, data in tqdm(enumerate(trainloader)):
+    for batch_idx, data in enumerate(trainloader):
         if len(data)== 2:
             data, label= data
             data = data.permute(0, 2, 1)
