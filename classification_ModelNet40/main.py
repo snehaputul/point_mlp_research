@@ -3,6 +3,7 @@ Usage:
 python main.py --model PointMLP --msg demo
 """
 import argparse
+import copy
 import os
 import logging
 import datetime
@@ -21,7 +22,6 @@ from torch.optim.lr_scheduler import CosineAnnealingLR
 import sklearn.metrics as metrics
 import numpy as np
 from tqdm import tqdm
-
 
 
 def parse_args():
@@ -59,7 +59,7 @@ def main():
         args.seed = np.random.randint(1, 10000)
     os.environ["HDF5_USE_FILE_LOCKING"] = "FALSE"
 
-    #assert torch.cuda.is_available(), "Please ensure codes are executed in cuda."
+    # assert torch.cuda.is_available(), "Please ensure codes are executed in cuda."
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     if args.seed is not None:
         torch.manual_seed(args.seed)
@@ -94,21 +94,26 @@ def main():
     # Model
     printf(f"args: {args}")
     printf('==> Building model..')
-    sparse_net = models.__dict__[args.model](points = args.num_points_low, k_neighbor=[args.neighbours_low]*4)
-    sparse_net.classifier[0]= torch.nn.Linear(1280, 512)
-    dense_net = Model(points=args.num_points_high, class_num= 40, embed_dim=args.num_channel, groups=1, res_expansion=1.0,
-                   activation="relu", bias=False, use_xyz=False, normalize="anchor",
-                   dim_expansion=[2, 2, 2, 2], pre_blocks=[2, 2, 2, 2], pos_blocks=[2, 2, 2, 2],
-                   k_neighbors= [args.neighbours_high]*4, reducers=[2, 2, 2, 2])
+    sparse_net = models.__dict__[args.model](points=args.num_points_low, k_neighbor=[args.neighbours_low] * 4)
+    sparse_net.classifier[0] = torch.nn.Linear(1280, 512)
+    dense_net = Model(points=args.num_points_high, class_num=40, embed_dim=args.num_channel, groups=1,
+                      res_expansion=1.0,
+                      activation="relu", bias=False, use_xyz=False, normalize="anchor",
+                      dim_expansion=[2, 2, 2, 2], pre_blocks=[2, 2, 2, 2], pos_blocks=[2, 2, 2, 2],
+                      k_neighbors=[args.neighbours_high] * 4, reducers=[2, 2, 2, 2])
+
+    total_param = sum(p.numel() for p in sparse_net.parameters() if p.requires_grad) + sum(
+        p.numel() for p in dense_net.parameters() if p.requires_grad)
+    printf(f"total param: {total_param / 1e6:.2f}M")
 
     criterion = cal_loss
     sparse_net = sparse_net.to(device)
     dense_net = dense_net.to(device)
     # criterion = criterion.to(device)
-    if device == 'cuda':
-        sparse_net = torch.nn.DataParallel(sparse_net)
-        dense_net = torch.nn.DataParallel(dense_net)
-        cudnn.benchmark = True
+    # if device == 'cuda':
+    #     sparse_net = torch.nn.DataParallel(sparse_net)
+    #     dense_net = torch.nn.DataParallel(dense_net)
+    #     cudnn.benchmark = True
 
     best_test_acc = 0.  # best test accuracy
     best_train_acc = 0.
@@ -142,19 +147,45 @@ def main():
         optimizer_dict = checkpoint['optimizer']
 
     printf('==> Preparing data..')
-    train_loader = DataLoader(ModelNet40(partition='train', num_points=args.num_points_high, dual_net= args.dual_net, num_points_low= args.num_points_low), num_workers=args.workers,
+    train_loader = DataLoader(ModelNet40(partition='train', num_points=args.num_points_high, dual_net=args.dual_net,
+                                         num_points_low=args.num_points_low), num_workers=args.workers,
                               batch_size=args.batch_size, shuffle=True, drop_last=True)
-    test_loader = DataLoader(ModelNet40(partition='test', num_points=args.num_points_high, dual_net= args.dual_net, num_points_low= args.num_points_low), num_workers=args.workers,
+    test_loader = DataLoader(ModelNet40(partition='test', num_points=args.num_points_high, dual_net=args.dual_net,
+                                        num_points_low=args.num_points_low), num_workers=args.workers,
                              batch_size=args.batch_size // 2, shuffle=False, drop_last=False)
 
-    optimizer = torch.optim.SGD(list(sparse_net.parameters())+list(dense_net.parameters()), lr=args.learning_rate, momentum=0.9, weight_decay=args.weight_decay)
+    try:
+        from thop import profile, clever_format
+        data = next(iter(train_loader))
+        data, data2, label = data
+        data, data2 = data.permute(0, 2, 1), data2.permute(0, 2, 1)
+        data, data2 = data.to(device), data2.to(device)
+
+        # dense net
+        flops, params = profile(copy.deepcopy(dense_net), inputs=(data,))
+        flops2, params2 = clever_format([flops, params])
+        dense_logits, inter_x = dense_net(data)
+        print('\n# Model Params: {} FLOPs: {}'.format(params2, flops2))
+
+        # sparse net
+        flops, params = profile(copy.deepcopy(sparse_net), inputs=(data2, inter_x,))
+        flops1, params1 = clever_format([flops, params])
+        print('\n# Model Params: {} FLOPs: {}'.format(params1, flops1))
+
+    except Exception as e:
+        print(e)
+        print("could not calculate flops")
+
+    optimizer = torch.optim.SGD(list(sparse_net.parameters()) + list(dense_net.parameters()), lr=args.learning_rate,
+                                momentum=0.9, weight_decay=args.weight_decay)
     if optimizer_dict is not None:
         optimizer.load_state_dict(optimizer_dict)
     scheduler = CosineAnnealingLR(optimizer, args.epoch, eta_min=args.min_lr, last_epoch=start_epoch - 1)
 
     for epoch in range(start_epoch, args.epoch):
         printf('Epoch(%d/%s) Learning Rate %s:' % (epoch + 1, args.epoch, optimizer.param_groups[0]['lr']))
-        train_out = train(sparse_net, dense_net, train_loader, optimizer, criterion, device)  # {"loss", "acc", "acc_avg", "time"}
+        train_out = train(sparse_net, dense_net, train_loader, optimizer, criterion,
+                          device)  # {"loss", "acc", "acc_avg", "time"}
         test_out = validate(sparse_net, dense_net, test_loader, criterion, device)
         scheduler.step()
 
@@ -209,14 +240,15 @@ def train(sparse_net, dense_net, trainloader, optimizer, criterion, device):
     train_true = []
     time_cost = datetime.datetime.now()
     for batch_idx, data in enumerate(trainloader):
-        if len(data)== 2:
-            data, label= data
+        if len(data) == 2:
+            data, label = data
             data = data.permute(0, 2, 1)
-        elif len(data)== 3:
-            data, data2, label= data
+            data, label = data.to(device), label.to(device).squeeze()
+        elif len(data) == 3:
+            data, data2, label = data
             data = data.permute(0, 2, 1)
             data2 = data2.permute(0, 2, 1)
-        data, label = data.to(device), label.to(device).squeeze()
+            data, data2, label = data.to(device), data2.to(device), label.to(device).squeeze()
 
         optimizer.zero_grad()
         dense_logits, inter_x = dense_net(data, debug=False)
