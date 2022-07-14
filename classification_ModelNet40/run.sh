@@ -9,7 +9,7 @@
 #SBATCH --error=/scratch/a/amiilab/shuvendu/OUTPUTS/PointMLP/%A.out
 #SBATCH --output=/scratch/a/amiilab/shuvendu/OUTPUTS/PointMLP/%A.out
 #SBATCH --open-mode=append                      # Append is important because otherwise preemption resets the file
-#SBATCH --array=0-1%1                           # auto submit 2 times
+# SBATCH --array=0-1%1                           # auto submit 2 times
 #SBATCH --job-name=main
 #SBATCH --time=24:00:00
 
@@ -29,8 +29,8 @@ echo "Port: $MPORT"
 module load MistEnv/2020a cuda gcc anaconda3 cmake cudnn swig sox/14.4.2
 source activate pytorch_env
 
-COMMAND="python -W ignore main.py --model pointMLP --workers 16 --dual_net True --num_points_low 256 --num_points_high 2048 --neighbours_high 24 --num_channel 16 --neighbours_low 12  --msg dual_last --seed 0"
-echo "Command: $COMMAND"
+COMMAND="python -W ignore pointmlp.py --model pointMLP --num_points 2048 --workers 16 --msg pt_2048 --seed 0"
+echo "$COMMAND"
 $COMMAND
 
 # sbatch -p debug_full_node --mail-type NONE --time '0:30:00' --array 0 run.sh

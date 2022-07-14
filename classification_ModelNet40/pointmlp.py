@@ -6,6 +6,8 @@ import argparse
 import os
 import logging
 import datetime
+import shutil
+
 import torch
 import torch.nn.parallel
 import torch.backends.cudnn as cudnn
@@ -14,13 +16,25 @@ import torch.utils.data
 import torch.utils.data.distributed
 from torch.utils.data import DataLoader
 import models as models
-from utils import Logger, mkdir_p, progress_bar, save_model, save_args, cal_loss
+from utils import Logger, mkdir_p, progress_bar, save_args, cal_loss
 from data import ModelNet40
 from torch.optim.lr_scheduler import CosineAnnealingLR
 import sklearn.metrics as metrics
 import numpy as np
-from tqdm import tqdm
-from torchsummary import summary
+
+
+def save_model(net, epoch, path, acc, is_best, **kwargs):
+    state = {
+        'net': net.state_dict(),
+        'epoch': epoch,
+        'acc': acc
+    }
+    for key, value in kwargs.items():
+        state[key] = value
+    filepath = os.path.join(path, "last_checkpoint.pth")
+    torch.save(state, filepath)
+    if is_best:
+        shutil.copyfile(filepath, os.path.join(path, 'best_checkpoint.pth'))
 
 
 def parse_args():
@@ -49,7 +63,7 @@ def main():
         args.seed = np.random.randint(1, 10000)
     os.environ["HDF5_USE_FILE_LOCKING"] = "FALSE"
 
-    #assert torch.cuda.is_available(), "Please ensure codes are executed in cuda."
+    # assert torch.cuda.is_available(), "Please ensure codes are executed in cuda."
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     if args.seed is not None:
         torch.manual_seed(args.seed)
@@ -124,9 +138,11 @@ def main():
         optimizer_dict = checkpoint['optimizer']
 
     printf('==> Preparing data..')
-    train_loader = DataLoader(ModelNet40(partition='train', num_points=args.num_points, dual_net= args.dual_net, num_points_low= args.num_points_low), num_workers=args.workers,
+    train_loader = DataLoader(ModelNet40(partition='train', num_points=args.num_points, dual_net=args.dual_net),
+                              num_workers=args.workers,
                               batch_size=args.batch_size, shuffle=True, drop_last=True)
-    test_loader = DataLoader(ModelNet40(partition='test', num_points=args.num_points, dual_net= args.dual_net, num_points_low= args.num_points_low), num_workers=args.workers,
+    test_loader = DataLoader(ModelNet40(partition='test', num_points=args.num_points, dual_net=args.dual_net),
+                             num_workers=args.workers,
                              batch_size=args.batch_size // 2, shuffle=False, drop_last=False)
 
     optimizer = torch.optim.SGD(net.parameters(), lr=args.learning_rate, momentum=0.9, weight_decay=args.weight_decay)
@@ -189,18 +205,18 @@ def train(net, trainloader, optimizer, criterion, device):
     train_pred = []
     train_true = []
     time_cost = datetime.datetime.now()
-    for batch_idx, data in tqdm(enumerate(trainloader)):
-        if len(data)== 2:
-            data, label= data
+    for batch_idx, data in enumerate(trainloader):
+        if len(data) == 2:
+            data, label = data
             data = data.permute(0, 2, 1)
-        elif len(data)== 3:
-            data, data2, label= data
+        elif len(data) == 3:
+            data, data2, label = data
             data = data.permute(0, 2, 1)
             data2 = data2.permute(0, 2, 1)
         data, label = data.to(device), label.to(device).squeeze()
 
         optimizer.zero_grad()
-        logits = net(data)
+        logits, _ = net(data)
         loss = criterion(logits, label)
         loss.backward()
         torch.nn.utils.clip_grad_norm_(net.parameters(), 1)
@@ -240,7 +256,7 @@ def validate(net, testloader, criterion, device):
         for batch_idx, (data, label) in enumerate(testloader):
             data, label = data.to(device), label.to(device).squeeze()
             data = data.permute(0, 2, 1)
-            logits = net(data)
+            logits, _ = net(data)
             loss = criterion(logits, label)
             test_loss += loss.item()
             preds = logits.max(dim=1)[1]
