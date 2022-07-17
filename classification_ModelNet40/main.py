@@ -296,11 +296,12 @@ def validate(sparse_net, dense_net, testloader, criterion, device):
             if len(data) == 2:
                 data, label = data
                 data = data.permute(0, 2, 1)
+                data, label = data.to(device), label.to(device).squeeze()
             elif len(data) == 3:
                 data, data2, label = data
                 data = data.permute(0, 2, 1)
                 data2 = data2.permute(0, 2, 1)
-            data, label = data.to(device), label.to(device).squeeze()
+                data, data2, label = data.to(device), data2.to(device), label.to(device).squeeze()
 
             dense_logits, inter_x = dense_net(data, debug=False)
             logits, inter_x = sparse_net(data2, inter_x, debug=False)
