@@ -316,6 +316,10 @@ class Model(nn.Module):
 
             last_channel = out_channel
 
+        self.maxpool= torch.nn.MaxPool1d(8)
+
+
+
         self.act = get_activation(activation)
         self.classifier = nn.Sequential(
             nn.Linear(last_channel, 512),
@@ -345,6 +349,10 @@ class Model(nn.Module):
             if debug:
                 print(x.shape)
             x = self.pos_blocks_list[i](x)  # [b,d,g]
+            if inter_x_prv != None:
+                x_pool= self.maxpool(inter_x_prv[i])
+                x_pool = x_pool.repeat(1,4,1)
+                x = x_pool * x
             if debug:
                 print(x.shape)
             inter_x.append(x)
