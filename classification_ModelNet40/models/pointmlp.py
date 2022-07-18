@@ -281,11 +281,12 @@ class Model(nn.Module):
     def __init__(self, points=1024, class_num=40, embed_dim=64, groups=1, res_expansion=1.0,
                  activation="relu", bias=True, use_xyz=True, normalize="center",
                  dim_expansion=[2, 2, 2, 2], pre_blocks=[2, 2, 2, 2], pos_blocks=[2, 2, 2, 2],
-                 k_neighbors=[32, 32, 32, 32], reducers=[2, 2, 2, 2], **kwargs):
+                 k_neighbors=[32, 32, 32, 32], reducers=[2, 2, 2, 2], parser_args= None, **kwargs):
         super(Model, self).__init__()
         self.stages = len(pre_blocks)
         self.class_num = class_num
         self.points = points
+        self.args = parser_args
         self.embedding = ConvBNReLU1D(3, embed_dim, bias=bias, activation=activation)
         assert len(pre_blocks) == len(k_neighbors) == len(reducers) == len(pos_blocks) == len(dim_expansion), \
             "Please check stage number consistent for pre_blocks, pos_blocks k_neighbors, reducers."
@@ -293,6 +294,7 @@ class Model(nn.Module):
         self.pre_blocks_list = nn.ModuleList()
         self.pos_blocks_list = nn.ModuleList()
         last_channel = embed_dim
+        self.factor_channel = int(64 / self.args.num_channel)
         anchor_points = self.points
         for i in range(len(pre_blocks)):
             out_channel = last_channel * dim_expansion[i]
@@ -316,7 +318,7 @@ class Model(nn.Module):
 
             last_channel = out_channel
 
-        self.maxpool= torch.nn.MaxPool1d(8)
+        self.maxpool= torch.nn.MaxPool1d(int(self.args.num_points_high/self.args.num_points_low))
 
 
 
@@ -351,7 +353,7 @@ class Model(nn.Module):
             x = self.pos_blocks_list[i](x)  # [b,d,g]
             if inter_x_prv != None:
                 x_pool= self.maxpool(inter_x_prv[i])
-                x_pool = x_pool.repeat(1,4,1)
+                x_pool = x_pool.repeat(1,self.factor_channel,1)
                 x = x_pool * x
             if debug:
                 print(x.shape)

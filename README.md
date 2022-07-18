@@ -163,11 +163,13 @@ neighbours_low: 12
 neighbours_high: 24
 ```
 
-| Experiment                        | Results | Script                                                                                                                                                                        |
-|-----------------------------------|---------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Original PointMLP (expected 94.5) | 93.5%   |                                                                                                                                                                               |
-| Original PointMLP                 |         | --model pointMLP --num_points 2048 --workers 16 --msg pt_2048 --seed 0                                                                                                        |
-| Original PointMLP                 |         | --model pointMLP --num_points 512 --workers 16 --msg pt_512 --seed 0                                                                                                          |
-| Original PointMLP                 |         | --model pointMLP --num_points 256 --workers 16 --msg pt_256 --seed 0                                                                                                          |
-| Original PointMLP                 |         | --model pointMLP --num_points 128 --workers 16 --msg pt_128 --seed 0                                                                                                          |
-| Dual PointMLP (last layer concat) | 92.3%   | --model pointMLP --workers 16 --dual_net True --num_points_low 256 --num_points_high 2048 --neighbours_high 24 --num_channel 16 --neighbours_low 12  --msg dual_last --seed 0 |
+| Experiment                                       | Results | Script                                                                                                                                                                                     |
+|--------------------------------------------------|---------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Original PointMLP (expected 94.5)                | 93.5%   |                                                                                                                                                                                            |
+| Original PointMLP                                |         | --model pointMLP --num_points 2048 --workers 16 --msg pt_2048 --seed 0                                                                                                                     |
+| Original PointMLP                                |         | --model pointMLP --num_points 512 --workers 16 --msg pt_512 --seed 0                                                                                                                       |
+| Original PointMLP                                |         | --model pointMLP --num_points 256 --workers 16 --msg pt_256 --seed 0                                                                                                                       |
+| Original PointMLP                                |         | --model pointMLP --num_points 128 --workers 16 --msg pt_128 --seed 0                                                                                                                       |
+| Dual PointMLP (last layer concat)                | 92.3%   | --model pointMLP --workers 16 --dual_net True --num_points_low 256 --num_points_high 2048 --neighbours_high 24 --num_channel 16 --neighbours_low 12  --msg dual_last --seed 0              |
+| Dual PointMLP (lateral concat) low_points = 256  |         | --model pointMLP --workers 16 --dual_net True --num_points_low 256 --num_points_high 2048 --neighbours_high 24 --num_channel 16 --neighbours_low 12  --msg dual_lateral_low256 --seed 0    |
+| Dual PointMLP (lateral concat) low_points = 1024 |         | --model pointMLP --workers 16 --dual_net True --num_points_low 1024 --num_points_high 2048 --neighbours_high 24 --num_channel 16 --neighbours_low 12  --msg dual_lateral_low_1024 --seed 0 |

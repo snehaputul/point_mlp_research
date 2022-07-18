@@ -94,13 +94,13 @@ def main():
     # Model
     printf(f"args: {args}")
     printf('==> Building model..')
-    sparse_net = models.__dict__[args.model](points=args.num_points_low, k_neighbor=[args.neighbours_low] * 4)
+    sparse_net =Model(points=args.num_points_low, k_neighbor=[args.neighbours_low] * 4, parser_args=args)
     sparse_net.classifier[0] = torch.nn.Linear(1280, 512)
     dense_net = Model(points=args.num_points_high, class_num=40, embed_dim=args.num_channel, groups=1,
                       res_expansion=1.0,
                       activation="relu", bias=False, use_xyz=False, normalize="anchor",
                       dim_expansion=[2, 2, 2, 2], pre_blocks=[2, 2, 2, 2], pos_blocks=[2, 2, 2, 2],
-                      k_neighbors=[args.neighbours_high] * 4, reducers=[2, 2, 2, 2])
+                      k_neighbors=[args.neighbours_high] * 4, reducers=[2, 2, 2, 2], parser_args=args)
 
     total_param = sum(p.numel() for p in sparse_net.parameters() if p.requires_grad) + sum(
         p.numel() for p in dense_net.parameters() if p.requires_grad)
