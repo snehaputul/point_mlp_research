@@ -294,7 +294,8 @@ class Model(nn.Module):
         self.pre_blocks_list = nn.ModuleList()
         self.pos_blocks_list = nn.ModuleList()
         last_channel = embed_dim
-        self.factor_channel = int(64 / self.args.num_channel)
+        if self.args is not None:
+            self.factor_channel = int(64 / self.args.num_channel)
         anchor_points = self.points
         for i in range(len(pre_blocks)):
             out_channel = last_channel * dim_expansion[i]
@@ -317,8 +318,8 @@ class Model(nn.Module):
             self.pos_blocks_list.append(pos_block_module)
 
             last_channel = out_channel
-
-        self.maxpool= torch.nn.MaxPool1d(int(self.args.num_points_high/self.args.num_points_low))
+        if self.args is not None:
+            self.maxpool= torch.nn.MaxPool1d(int(self.args.num_points_high/self.args.num_points_low))
 
 
 
