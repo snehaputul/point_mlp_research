@@ -45,6 +45,7 @@ def parse_args():
     parser.add_argument('--msg', type=str, help='message after checkpoint')
     parser.add_argument('--dual_net', type=bool, default=False, help='enable dual network')
     parser.add_argument('--batch_size', type=int, default=32, help='batch size in training')
+    parser.add_argument('--gpu', type=int, default=32, help='device selection')
     parser.add_argument('--model', default='PointNet', help='model name [default: pointnet_cls]')
     parser.add_argument('--epoch', default=300, type=int, help='number of epoch in training')
     parser.add_argument('--num_points', type=int, default=1024, help='Point Number')
@@ -64,7 +65,11 @@ def main():
     os.environ["HDF5_USE_FILE_LOCKING"] = "FALSE"
 
     # assert torch.cuda.is_available(), "Please ensure codes are executed in cuda."
-    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    if not torch.cuda.is_available():
+        device = 'cpu'
+    else:
+        device = 'cuda:{}'.format(args.gpu)
+
     if args.seed is not None:
         torch.manual_seed(args.seed)
         np.random.seed(args.seed)

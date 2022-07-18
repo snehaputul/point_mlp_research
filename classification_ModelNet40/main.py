@@ -35,6 +35,7 @@ def parse_args():
     parser.add_argument('--model', default='PointNet', help='model name [default: pointnet_cls]')
     parser.add_argument('--epoch', default=300, type=int, help='number of epoch in training')
     parser.add_argument('--num_points', type=int, default=1024, help='Point Number')
+    parser.add_argument('--gpu', type=int, default=0, help='device selection')
     parser.add_argument('--learning_rate', default=0.1, type=float, help='learning rate in training')
     parser.add_argument('--min_lr', default=0.005, type=float, help='min lr')
     parser.add_argument('--weight_decay', type=float, default=2e-4, help='decay rate')
@@ -60,7 +61,11 @@ def main():
     os.environ["HDF5_USE_FILE_LOCKING"] = "FALSE"
 
     # assert torch.cuda.is_available(), "Please ensure codes are executed in cuda."
-    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    if not torch.cuda.is_available():
+        device = 'cpu'
+    else:
+        device = 'cuda:{}'.format(args.gpu)
+
     if args.seed is not None:
         torch.manual_seed(args.seed)
         np.random.seed(args.seed)
