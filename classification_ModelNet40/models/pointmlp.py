@@ -362,9 +362,15 @@ class Model(nn.Module):
 
         x = F.adaptive_max_pool1d(x, 1).squeeze(dim=-1)
         inter_x.append(x)
+
         if inter_x_prv!= None:
+            if self.args.last_layer_concat== 'multiply':
+                x_pool = inter_x_prv[-1].repeat(1, self.factor_channel)
+                x= x_pool * x
+
             #x= x*inter_x_prv[-1]
-            x= torch.cat((x, inter_x_prv[-1]), -1)
+            else:
+                x= torch.cat((x, inter_x_prv[-1]), -1)
         x = self.classifier(x)
         return x, inter_x
 
