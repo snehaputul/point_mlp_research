@@ -42,6 +42,7 @@ def parse_args():
     parser.add_argument('--seed', type=int, help='random seed')
     parser.add_argument('--workers', default=8, type=int, help='workers')
     parser.add_argument('--last_layer_concat', default='concat', type=str, help='last layer concatenation')
+    parser.add_argument('--add_factor', default=1.0, type=float, help='last layer concatenation')
 
     # sparse net parameters
     parser.add_argument('--num_points_low', type=int, default=128, help='Point Number')
@@ -100,7 +101,7 @@ def main():
     # Model
     printf(f"args: {args}")
     printf('==> Building model..')
-    sparse_net =Model(points=args.num_points_low, k_neighbor=[args.neighbours_low] * 4, parser_args=args)
+    sparse_net = Model(points=args.num_points_low, k_neighbors=[args.neighbours_low] * 4, parser_args=args)
     if args.last_layer_concat == 'concat':
         sparse_net.classifier[0] = torch.nn.Linear(1280, 512)
     dense_net = Model(points=args.num_points_high, class_num=40, embed_dim=args.num_channel, groups=1,
@@ -192,8 +193,8 @@ def main():
     for epoch in range(start_epoch, args.epoch):
         printf('Epoch(%d/%s) Learning Rate %s:' % (epoch + 1, args.epoch, optimizer.param_groups[0]['lr']))
         train_out = train(sparse_net, dense_net, train_loader, optimizer, criterion,
-                          device)  # {"loss", "acc", "acc_avg", "time"}
-        test_out = validate(sparse_net, dense_net, test_loader, criterion, device)
+                          device, epoch, args)  # {"loss", "acc", "acc_avg", "time"}
+        test_out = validate(sparse_net, dense_net, test_loader, criterion, device, epoch, args)
         scheduler.step()
 
         if test_out["acc"] > best_test_acc:
@@ -237,7 +238,7 @@ def main():
     printf(f"++++++++" * 5)
 
 
-def train(sparse_net, dense_net, trainloader, optimizer, criterion, device):
+def train(sparse_net, dense_net, trainloader, optimizer, criterion, device, epoch, args):
     sparse_net.train()
     dense_net.train()
     train_loss = 0
@@ -258,8 +259,16 @@ def train(sparse_net, dense_net, trainloader, optimizer, criterion, device):
             data, data2, label = data.to(device), data2.to(device), label.to(device).squeeze()
 
         optimizer.zero_grad()
-        dense_logits, inter_x = dense_net(data, debug=False)
-        logits, inter_x = sparse_net(data2, inter_x, debug=False)
+        if batch_idx == 0 and epoch == 0:
+            debug = True
+        else:
+            debug = False
+
+        if args.dual_net:
+            dense_logits, inter_x = dense_net(data, debug=debug)
+        else:
+            inter_x = None
+        logits, inter_x = sparse_net(data2, inter_x, debug=debug)
 
         loss = criterion(logits, label)
         loss.backward()
@@ -289,7 +298,7 @@ def train(sparse_net, dense_net, trainloader, optimizer, criterion, device):
     }
 
 
-def validate(sparse_net, dense_net, testloader, criterion, device):
+def validate(sparse_net, dense_net, testloader, criterion, device, epoch, args):
     sparse_net.eval()
     dense_net.eval()
     test_loss = 0
@@ -310,8 +319,12 @@ def validate(sparse_net, dense_net, testloader, criterion, device):
                 data2 = data2.permute(0, 2, 1)
                 data, data2, label = data.to(device), data2.to(device), label.to(device).squeeze()
 
-            dense_logits, inter_x = dense_net(data, debug=False)
+            if args.dual_net:
+                dense_logits, inter_x = dense_net(data, debug=False)
+            else:
+                inter_x = None
             logits, inter_x = sparse_net(data2, inter_x, debug=False)
+
             loss = criterion(logits, label)
             test_loss += loss.item()
             preds = logits.max(dim=1)[1]
