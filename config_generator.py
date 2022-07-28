@@ -5,9 +5,9 @@ def generate_run_ssh(cfg, port_id):
     lines = []
     with open('classification_ModelNet40/run.sh', 'r') as f:
         lines = f.readlines()
-    lines[31] = 'COMMAND="python -W ignore main.py {}\n"'.format(cfg)
+    lines[31] = 'COMMAND="python -W ignore main.py {}"\n'.format(cfg)
 
-    with open(os.path.join('{}.sh').format(port_id), 'w', newline='\n') as f:
+    with open(os.path.join('classification_ModelNet40/{}.sh').format(port_id), 'w', newline='\n') as f:
         for line in lines:
             f.writelines(line)
 
