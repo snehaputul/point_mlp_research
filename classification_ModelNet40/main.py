@@ -45,12 +45,12 @@ def parse_args():
     parser.add_argument('--add_factor', default=1.0, type=float, help='last layer concatenation')
 
     # sparse net parameters
-    parser.add_argument('--num_points_low', type=int, default=128, help='Point Number')
-    parser.add_argument('--neighbours_low', type=int, default=12, help='Point Number')
+    parser.add_argument('--num_points_low', type=int, default=1024, help='Point Number')
+    parser.add_argument('--neighbours_low', type=int, default=32, help='Point Number')
 
     # dense net parameteres
     parser.add_argument('--num_points_high', type=int, default=2048, help='Point Number')
-    parser.add_argument('--neighbours_high', type=int, default=24, help='Point Number')
+    parser.add_argument('--neighbours_high', type=int, default=32, help='Point Number')
     parser.add_argument('--num_channel', type=int, default=32, help='Point Number')
 
     return parser.parse_args()
@@ -348,3 +348,9 @@ def validate(sparse_net, dense_net, testloader, criterion, device, epoch, args):
 
 if __name__ == '__main__':
     main()
+
+    try:
+        print("Finish Training. Canceling job...")
+        os.system('scancel %s' % os.environ["SLURM_ARRAY_JOB_ID"])
+    except:
+        print("Finish Training...")
