@@ -266,9 +266,9 @@ def train(sparse_net, dense_net, trainloader, optimizer, criterion, device, epoc
 
         if args.dual_net:
             dense_logits, inter_x = dense_net(data, debug=debug)
+            logits, _ = sparse_net(data2, inter_x, debug=debug)
         else:
-            inter_x = None
-        logits, inter_x = sparse_net(data2, inter_x, debug=debug)
+            logits, _ = sparse_net(data, None, debug=debug)
 
         loss = criterion(logits, label)
         loss.backward()
