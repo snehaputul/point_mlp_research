@@ -102,7 +102,7 @@ def main():
     printf(f"args: {args}")
     printf('==> Building model..')
     sparse_net = Model(points=args.num_points_low, k_neighbors=[args.neighbours_low] * 4, parser_args=args)
-    if args.last_layer_concat == 'concat':
+    if args.dual_net and args.last_layer_concat == 'concat':
         sparse_net.classifier[0] = torch.nn.Linear(1280, 512)
     dense_net = Model(points=args.num_points_high, class_num=40, embed_dim=args.num_channel, groups=1,
                       res_expansion=1.0,
@@ -321,9 +321,9 @@ def validate(sparse_net, dense_net, testloader, criterion, device, epoch, args):
 
             if args.dual_net:
                 dense_logits, inter_x = dense_net(data, debug=False)
+                logits, _ = sparse_net(data2, inter_x, debug=False)
             else:
-                inter_x = None
-            logits, inter_x = sparse_net(data2, inter_x, debug=False)
+                logits, _ = sparse_net(data, None, debug=False)
 
             loss = criterion(logits, label)
             test_loss += loss.item()
