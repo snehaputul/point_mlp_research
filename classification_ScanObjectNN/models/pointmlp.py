@@ -1,12 +1,13 @@
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+
+
 # from torch import einsum
 # from einops import rearrange, repeat
 
 
-#from pointnet2_ops import pointnet2_utils
+# from pointnet2_ops import pointnet2_utils
 
 
 def get_activation(activation):
@@ -147,8 +148,8 @@ class LocalGrouper(nn.Module):
             print(f"Unrecognized normalize parameter (self.normalize), set to None. Should be one of [center, anchor].")
             self.normalize = None
         if self.normalize is not None:
-            add_channel=3 if self.use_xyz else 0
-            self.affine_alpha = nn.Parameter(torch.ones([1,1,1,channel + add_channel]))
+            add_channel = 3 if self.use_xyz else 0
+            self.affine_alpha = nn.Parameter(torch.ones([1, 1, 1, channel + add_channel]))
             self.affine_beta = nn.Parameter(torch.zeros([1, 1, 1, channel + add_channel]))
 
     def forward(self, xyz, points):
@@ -158,7 +159,7 @@ class LocalGrouper(nn.Module):
 
         # fps_idx = torch.multinomial(torch.linspace(0, N - 1, steps=N).repeat(B, 1).to(xyz.device), num_samples=self.groups, replacement=False).long()
         fps_idx = farthest_point_sample(xyz, self.groups).long()
-        #fps_idx = pointnet2_utils.furthest_point_sample(xyz, self.groups).long()  # [B, npoint]
+        # fps_idx = pointnet2_utils.furthest_point_sample(xyz, self.groups).long()  # [B, npoint]
         new_xyz = index_points(xyz, fps_idx)  # [B, npoint, 3]
         new_points = index_points(points, fps_idx)  # [B, npoint, d]
 
@@ -167,16 +168,17 @@ class LocalGrouper(nn.Module):
         grouped_xyz = index_points(xyz, idx)  # [B, npoint, k, 3]
         grouped_points = index_points(points, idx)  # [B, npoint, k, d]
         if self.use_xyz:
-            grouped_points = torch.cat([grouped_points, grouped_xyz],dim=-1)  # [B, npoint, k, d+3]
+            grouped_points = torch.cat([grouped_points, grouped_xyz], dim=-1)  # [B, npoint, k, d+3]
         if self.normalize is not None:
-            if self.normalize =="center":
+            if self.normalize == "center":
                 mean = torch.mean(grouped_points, dim=2, keepdim=True)
-            if self.normalize =="anchor":
-                mean = torch.cat([new_points, new_xyz],dim=-1) if self.use_xyz else new_points
+            if self.normalize == "anchor":
+                mean = torch.cat([new_points, new_xyz], dim=-1) if self.use_xyz else new_points
                 mean = mean.unsqueeze(dim=-2)  # [B, npoint, 1, d+3]
-            std = torch.std((grouped_points-mean).reshape(B,-1),dim=-1,keepdim=True).unsqueeze(dim=-1).unsqueeze(dim=-1)
-            grouped_points = (grouped_points-mean)/(std + 1e-5)
-            grouped_points = self.affine_alpha*grouped_points + self.affine_beta
+            std = torch.std((grouped_points - mean).reshape(B, -1), dim=-1, keepdim=True).unsqueeze(dim=-1).unsqueeze(
+                dim=-1)
+            grouped_points = (grouped_points - mean) / (std + 1e-5)
+            grouped_points = self.affine_alpha * grouped_points + self.affine_beta
 
         new_points = torch.cat([grouped_points, new_points.view(B, S, 1, -1).repeat(1, 1, self.kneighbors, 1)], dim=-1)
         return new_xyz, new_points
@@ -228,7 +230,7 @@ class ConvBNReLURes1D(nn.Module):
 
 
 class PreExtraction(nn.Module):
-    def __init__(self, channels, out_channels,  blocks=1, groups=1, res_expansion=1, bias=True,
+    def __init__(self, channels, out_channels, blocks=1, groups=1, res_expansion=1, bias=True,
                  activation='relu', use_xyz=True):
         """
         input: [b,g,k,d]: output:[b,d,g]
@@ -236,7 +238,7 @@ class PreExtraction(nn.Module):
         :param blocks:
         """
         super(PreExtraction, self).__init__()
-        in_channels = 3+2*channels if use_xyz else 2*channels
+        in_channels = 3 + 2 * channels if use_xyz else 2 * channels
         self.transfer = ConvBNReLU1D(in_channels, out_channels, bias=bias, activation=activation)
         operation = []
         for _ in range(blocks):
@@ -281,11 +283,12 @@ class Model(nn.Module):
     def __init__(self, points=1024, class_num=40, embed_dim=64, groups=1, res_expansion=1.0,
                  activation="relu", bias=True, use_xyz=True, normalize="center",
                  dim_expansion=[2, 2, 2, 2], pre_blocks=[2, 2, 2, 2], pos_blocks=[2, 2, 2, 2],
-                 k_neighbors=[32, 32, 32, 32], reducers=[2, 2, 2, 2], **kwargs):
+                 k_neighbors=[32, 32, 32, 32], reducers=[2, 2, 2, 2], parser_args=None):
         super(Model, self).__init__()
         self.stages = len(pre_blocks)
         self.class_num = class_num
         self.points = points
+        self.args = parser_args
         self.embedding = ConvBNReLU1D(3, embed_dim, bias=bias, activation=activation)
         assert len(pre_blocks) == len(k_neighbors) == len(reducers) == len(pos_blocks) == len(dim_expansion), \
             "Please check stage number consistent for pre_blocks, pos_blocks k_neighbors, reducers."
@@ -293,6 +296,8 @@ class Model(nn.Module):
         self.pre_blocks_list = nn.ModuleList()
         self.pos_blocks_list = nn.ModuleList()
         last_channel = embed_dim
+        if self.args is not None:
+            self.factor_channel = int(64 / self.args.num_channel)
         anchor_points = self.points
         for i in range(len(pre_blocks)):
             out_channel = last_channel * dim_expansion[i]
@@ -315,6 +320,8 @@ class Model(nn.Module):
             self.pos_blocks_list.append(pos_block_module)
 
             last_channel = out_channel
+        if self.args is not None:
+            self.maxpool = torch.nn.MaxPool1d(int(self.args.num_points_high / self.args.num_points_low))
 
         self.act = get_activation(activation)
         self.classifier = nn.Sequential(
@@ -329,35 +336,62 @@ class Model(nn.Module):
             nn.Linear(256, self.class_num)
         )
 
-    def forward(self, x):
+    def forward(self, x, inter_x_prv=None, debug=False):
+        inter_x = []
         xyz = x.permute(0, 2, 1)
         batch_size, _, _ = x.size()
         x = self.embedding(x)  # B,D,N
         for i in range(self.stages):
             # Give xyz[b, p, 3] and fea[b, p, d], return new_xyz[b, g, 3] and new_fea[b, g, k, d]
             xyz, x = self.local_grouper_list[i](xyz, x.permute(0, 2, 1))  # [b,g,3]  [b,g,k,d]
+            if debug:
+                print(xyz.shape)
+                print(x.size())
             x = self.pre_blocks_list[i](x)  # [b,d,g]
+            if debug:
+                print(x.shape)
             x = self.pos_blocks_list[i](x)  # [b,d,g]
+            if inter_x_prv != None:
+                x_pool = self.maxpool(inter_x_prv[i])
+                x_pool = x_pool.repeat(1, self.factor_channel, 1)
+                x = x_pool * x
+            if debug:
+                print(x.shape)
+            inter_x.append(x)
 
         x = F.adaptive_max_pool1d(x, 1).squeeze(dim=-1)
+        inter_x.append(x)
+        if debug:
+            print('END OF DEBUG!')
+
+        if inter_x_prv != None:
+            if self.args.last_layer_concat == 'multiply':
+                x_pool = inter_x_prv[-1].repeat(1, self.factor_channel)
+                x = x_pool * x
+            elif self.args.last_layer_concat == 'add':
+                x_pool = inter_x_prv[-1].repeat(1, self.factor_channel)
+                x = x_pool * self.args.add_factor + x
+            elif self.args.last_layer_concat == 'concat':
+                x = torch.cat((x, inter_x_prv[-1]), -1)
+            else:
+                x = x  # no connection in the last layer
         x = self.classifier(x)
-        return x
+        return x, inter_x
 
 
-
-
-def pointMLP(num_classes=40, **kwargs) -> Model:
-    return Model(points=1024, class_num=num_classes, embed_dim=64, groups=1, res_expansion=1.0,
-                   activation="relu", bias=False, use_xyz=False, normalize="anchor",
-                   dim_expansion=[2, 2, 2, 2], pre_blocks=[2, 2, 2, 2], pos_blocks=[2, 2, 2, 2],
-                   k_neighbors=[24, 24, 24, 24], reducers=[2, 2, 2, 2], **kwargs)
+def pointMLP(num_classes=40, points=1024, k_neighbor=[24, 24, 24, 24], num_channel=64, **kwargs) -> Model:
+    return Model(points=points, class_num=num_classes, embed_dim=64, groups=1, res_expansion=1.0,
+                 activation="relu", bias=False, use_xyz=False, normalize="anchor",
+                 dim_expansion=[2, 2, 2, 2], pre_blocks=[2, 2, 2, 2], pos_blocks=[2, 2, 2, 2],
+                 k_neighbors=k_neighbor, reducers=[2, 2, 2, 2], **kwargs)
 
 
 def pointMLPElite(num_classes=40, **kwargs) -> Model:
     return Model(points=1024, class_num=num_classes, embed_dim=32, groups=1, res_expansion=0.25,
-                   activation="relu", bias=False, use_xyz=False, normalize="anchor",
-                   dim_expansion=[2, 2, 2, 1], pre_blocks=[1, 1, 2, 1], pos_blocks=[1, 1, 2, 1],
-                   k_neighbors=[24,24,24,24], reducers=[2, 2, 2, 2], **kwargs)
+                 activation="relu", bias=False, use_xyz=False, normalize="anchor",
+                 dim_expansion=[2, 2, 2, 1], pre_blocks=[1, 1, 2, 1], pos_blocks=[1, 1, 2, 1],
+                 k_neighbors=[24, 24, 24, 24], reducers=[2, 2, 2, 2], **kwargs)
+
 
 if __name__ == '__main__':
     data = torch.rand(2, 3, 1024)
@@ -365,4 +399,3 @@ if __name__ == '__main__':
     model = pointMLP()
     out = model(data)
     print(out.shape)
-
