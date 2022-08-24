@@ -4,8 +4,8 @@
 #SBATCH --nodes=1                               # number of nodes requested
 #SBATCH --ntasks=1                              # this should be same as number of nodes
 #SBATCH --gpus-per-node=1
-#SBATCH --mail-user=sr195@queensu.ca
-#SBATCH --mail-type=END,FAIL
+# SBATCH --mail-user=sr195@queensu.ca
+# SBATCH --mail-type=END,FAIL
 #SBATCH --error=/scratch/a/amiilab/shuvendu/OUTPUTS/PointMLP/%A.out
 #SBATCH --output=/scratch/a/amiilab/shuvendu/OUTPUTS/PointMLP/%A.out
 #SBATCH --open-mode=append                      # Append is important because otherwise preemption resets the file
