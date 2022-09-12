@@ -7,7 +7,7 @@ def generate_run_ssh(cfg, port_id):
         lines = f.readlines()
     lines[31] = 'COMMAND="python -W ignore main.py {}"\n'.format(cfg)
 
-    with open(os.path.join('classification_ModelNet40/{}.sh').format(port_id), 'w', newline='\n') as f:
+    with open(os.path.join('classification_ScanObjectNN/{}.sh').format(port_id), 'w', newline='\n') as f:
         for line in lines:
             f.writelines(line)
 
@@ -18,6 +18,6 @@ with open('exps.txt', 'r') as f:
         line = line.strip()
         line_segs = line.split('|')
         if len(line_segs) > 3:
-            line = line_segs[3].strip()
+            line = line_segs[4].strip()
             generate_run_ssh(line, exp_id)
             exp_id += 1
