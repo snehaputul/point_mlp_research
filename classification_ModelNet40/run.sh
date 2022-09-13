@@ -9,7 +9,7 @@
 #SBATCH --error=/scratch/a/amiilab/shuvendu/OUTPUTS/PointMLP/%A.out
 #SBATCH --output=/scratch/a/amiilab/shuvendu/OUTPUTS/PointMLP/%A.out
 #SBATCH --open-mode=append                      # Append is important because otherwise preemption resets the file
-# SBATCH --array=0-1%1                           # auto submit 2 times
+#SBATCH --array=0-1%1                           # auto submit 2 times
 #SBATCH --job-name=main
 #SBATCH --time=24:00:00
 
