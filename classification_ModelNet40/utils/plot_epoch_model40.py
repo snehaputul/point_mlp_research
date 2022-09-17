@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 
 fig, ax = plt.subplots()
 #span = [100, 200, 300, 400]
-span_pos = [0, 1, 2, 3]
+span_pos = [100, 200, 300, 400]
 accuracy_mdl = [92.71, 93.23, 93.72, 92.99]
 accuracy_scn = [80.92, 84.53, 86.36, 85.7]
 text_position = [80.02, 80.15, 80.25, 79.87]
