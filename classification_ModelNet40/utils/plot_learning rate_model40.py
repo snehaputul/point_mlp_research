@@ -12,6 +12,9 @@ ax.scatter(span_pos, accuracy_mdl, s=50, marker='o', color='k', zorder=4)
 ax.scatter(span_pos, accuracy_scn, s=50, marker='o', color='k', zorder=4)
 ax.plot(span_pos, accuracy_mdl, color='r', label='ModelNet40', linewidth=2, zorder=3)
 ax.plot(span_pos, accuracy_scn, color='g', label='ScanObjectNN', linewidth=2, zorder=3)
+labels= ['0.1', '0.01', '0.001', '0.0001', '0.00001']
+ax.set_xticklabels(labels)
+
 
 for i, txt in enumerate(accuracy_mdl):
     ax.annotate(str(txt), (span_pos[i] , accuracy_mdl[i]+ 0.05), fontsize=15)
