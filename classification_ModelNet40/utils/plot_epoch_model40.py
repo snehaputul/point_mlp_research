@@ -21,7 +21,7 @@ for i, txt in enumerate(accuracy_scn):
 
 plt.grid()
 plt.xlabel('Epoch', fontsize=18)
-plt.ylabel('Accuracy', fontsize=18)
+plt.ylabel('Accuracy(%)', fontsize=18)
 #plt.ylim([79.2, 80.5])
 # plt.xlim([0, 100])
 ax.spines['top'].set_visible(False)

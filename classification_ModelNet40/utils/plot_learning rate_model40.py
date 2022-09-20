@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 
 fig, ax = plt.subplots()
 #span = [100, 200, 300, 400]
-span_pos = [0, 1, 2, 3, 4]
+span_pos = ['0', '1', '2', '3', '4']
 accuracy_mdl = [93.72, 92.67, 91.41, 91.05, 91.45]
 accuracy_scn = [86.36, 84.18, 81.71, 61.62, 31.78]
 text_position = [80.02, 80.15, 80.25, 79.87, 79.5]
@@ -24,7 +24,7 @@ for i, txt in enumerate(accuracy_scn):
 
 plt.grid()
 plt.xlabel('Learning rate', fontsize=18)
-plt.ylabel('Accuracy', fontsize=18)
+plt.ylabel('Accuracy(%)', fontsize=18)
 #plt.ylim([79.2, 80.5])
 # plt.xlim([0, 100])
 ax.spines['top'].set_visible(False)
